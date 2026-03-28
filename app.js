@@ -12,6 +12,16 @@
   let answered = [];
   let expandedStates = [];
 
+  // Fisher-Yates shuffle — randomizes card order each time a mode is entered
+  function shuffleArray(arr) {
+    const shuffled = arr.slice();
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  }
+
   // DOM refs
   const modeScreen = document.getElementById("modeScreen");
   const appShell = document.getElementById("appShell");
@@ -69,8 +79,8 @@
     // Set mode attribute on html for CSS theming
     document.documentElement.setAttribute("data-mode", mode);
 
-    // Filter cards
-    filteredCards = QUOTE_CARDS.filter((c) => c.mode === mode);
+    // Filter cards and shuffle for random order
+    filteredCards = shuffleArray(QUOTE_CARDS.filter((c) => c.mode === mode));
     currentIndex = 0;
     answered = new Array(filteredCards.length).fill(false);
     expandedStates = new Array(filteredCards.length).fill(false);
