@@ -6,16 +6,22 @@
   "use strict";
 
   // State
+  let currentMode = null;
+  let filteredCards = [];
   let currentIndex = 0;
-  let answered = new Array(QUOTE_CARDS.length).fill(false);
-  let expandedStates = new Array(QUOTE_CARDS.length).fill(false);
+  let answered = [];
+  let expandedStates = [];
 
   // DOM refs
+  const modeScreen = document.getElementById("modeScreen");
+  const appShell = document.getElementById("appShell");
   const container = document.getElementById("cardContainer");
   const counter = document.getElementById("cardCounter");
   const prevBtn = document.getElementById("prevBtn");
   const nextBtn = document.getElementById("nextBtn");
   const dotsContainer = document.getElementById("navDots");
+  const backBtn = document.getElementById("backBtn");
+  const modeBadge = document.getElementById("modeBadge");
 
   // ========================================
   // THEME TOGGLE
@@ -40,6 +46,70 @@
         : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
     }
   })();
+
+  // ========================================
+  // MODE SELECTION
+  // ========================================
+  const modeLabels = { all: "Everyone", teen: "Teens", parent: "Parents" };
+
+  document.querySelectorAll(".mode-card").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const mode = btn.dataset.mode;
+      enterMode(mode);
+    });
+  });
+
+  backBtn.addEventListener("click", () => {
+    exitMode();
+  });
+
+  function enterMode(mode) {
+    currentMode = mode;
+
+    // Set mode attribute on html for CSS theming
+    document.documentElement.setAttribute("data-mode", mode);
+
+    // Filter cards
+    filteredCards = QUOTE_CARDS.filter((c) => c.mode === mode);
+    currentIndex = 0;
+    answered = new Array(filteredCards.length).fill(false);
+    expandedStates = new Array(filteredCards.length).fill(false);
+
+    // Update badge
+    modeBadge.textContent = modeLabels[mode];
+    modeBadge.className = "mode-badge mode-badge--" + mode;
+
+    // Transition screens
+    modeScreen.classList.add("exiting");
+    setTimeout(() => {
+      modeScreen.hidden = true;
+      modeScreen.classList.remove("exiting");
+      appShell.hidden = false;
+      appShell.classList.add("entering");
+      renderAllCards();
+      requestAnimationFrame(() => {
+        appShell.classList.remove("entering");
+        appShell.classList.add("visible");
+      });
+    }, 300);
+  }
+
+  function exitMode() {
+    currentMode = null;
+    document.documentElement.removeAttribute("data-mode");
+
+    appShell.classList.remove("visible");
+    appShell.classList.add("exiting");
+    setTimeout(() => {
+      appShell.hidden = true;
+      appShell.classList.remove("exiting");
+      modeScreen.hidden = false;
+      modeScreen.classList.add("entering");
+      requestAnimationFrame(() => {
+        modeScreen.classList.remove("entering");
+      });
+    }, 250);
+  }
 
   // ========================================
   // RENDER CARDS
@@ -82,7 +152,7 @@
               <p class="expanded-text">${card.core_meaning}</p>
             </div>
             <div class="expanded-section">
-              <div class="expanded-label">Modern Scenario</div>
+              <div class="expanded-label">${currentMode === "teen" ? "Real-Life Example" : currentMode === "parent" ? "Parenting Scenario" : "Modern Scenario"}</div>
               <p class="expanded-text">${card.scenario_generic}</p>
             </div>
           </div>
@@ -100,25 +170,25 @@
   }
 
   function renderAllCards() {
-    container.innerHTML = QUOTE_CARDS.map((card, i) => renderCard(card, i)).join("");
+    container.innerHTML = filteredCards.map((card, i) => renderCard(card, i)).join("");
     renderDots();
     updateNav();
-    bindEvents();
+    bindCardEvents();
   }
 
   // ========================================
   // NAVIGATION
   // ========================================
   function renderDots() {
-    dotsContainer.innerHTML = QUOTE_CARDS.map(
+    dotsContainer.innerHTML = filteredCards.map(
       (_, i) => `<button class="nav-dot ${i === 0 ? "active" : ""}" data-dot="${i}" aria-label="Go to card ${i + 1}"></button>`
     ).join("");
   }
 
   function updateNav() {
-    counter.textContent = `${currentIndex + 1} / ${QUOTE_CARDS.length}`;
+    counter.textContent = `${currentIndex + 1} / ${filteredCards.length}`;
     prevBtn.disabled = currentIndex === 0;
-    nextBtn.disabled = currentIndex === QUOTE_CARDS.length - 1;
+    nextBtn.disabled = currentIndex === filteredCards.length - 1;
 
     document.querySelectorAll(".nav-dot").forEach((dot, i) => {
       dot.classList.toggle("active", i === currentIndex);
@@ -126,7 +196,7 @@
   }
 
   function goToCard(newIndex, direction) {
-    if (newIndex < 0 || newIndex >= QUOTE_CARDS.length || newIndex === currentIndex) return;
+    if (newIndex < 0 || newIndex >= filteredCards.length || newIndex === currentIndex) return;
 
     const cards = document.querySelectorAll(".quote-card");
     const oldCard = cards[currentIndex];
@@ -161,9 +231,9 @@
   }
 
   // ========================================
-  // EVENTS
+  // CARD EVENTS
   // ========================================
-  function bindEvents() {
+  function bindCardEvents() {
     // Expand triggers
     document.querySelectorAll(".card-expand-trigger").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -190,7 +260,7 @@
         if (answered[cardIdx]) return;
 
         const selectedIdx = parseInt(btn.dataset.index);
-        const card = QUOTE_CARDS[cardIdx];
+        const card = filteredCards[cardIdx];
         const isCorrect = selectedIdx === card.mcq_correct_index;
         const feedback = document.getElementById(`feedback-${cardIdx}`);
 
@@ -220,58 +290,55 @@
         });
       });
     });
-
-    // Nav buttons
-    prevBtn.addEventListener("click", () => goToCard(currentIndex - 1, "backward"));
-    nextBtn.addEventListener("click", () => goToCard(currentIndex + 1, "forward"));
-
-    // Dot navigation
-    dotsContainer.addEventListener("click", (e) => {
-      const dot = e.target.closest(".nav-dot");
-      if (dot) {
-        goToCard(parseInt(dot.dataset.dot));
-      }
-    });
-
-    // Keyboard navigation
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "ArrowRight" || e.key === "ArrowDown") {
-        e.preventDefault();
-        goToCard(currentIndex + 1, "forward");
-      } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
-        e.preventDefault();
-        goToCard(currentIndex - 1, "backward");
-      }
-    });
-
-    // Touch swipe
-    let touchStartX = 0;
-    let touchStartY = 0;
-    const viewport = document.getElementById("cardViewport");
-
-    viewport.addEventListener("touchstart", (e) => {
-      touchStartX = e.changedTouches[0].screenX;
-      touchStartY = e.changedTouches[0].screenY;
-    }, { passive: true });
-
-    viewport.addEventListener("touchend", (e) => {
-      const diffX = e.changedTouches[0].screenX - touchStartX;
-      const diffY = e.changedTouches[0].screenY - touchStartY;
-      const threshold = 50;
-
-      // Only horizontal swipes
-      if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > threshold) {
-        if (diffX < 0) {
-          goToCard(currentIndex + 1, "forward");
-        } else {
-          goToCard(currentIndex - 1, "backward");
-        }
-      }
-    }, { passive: true });
   }
 
   // ========================================
-  // INIT
+  // GLOBAL NAVIGATION EVENTS
   // ========================================
-  renderAllCards();
+  prevBtn.addEventListener("click", () => goToCard(currentIndex - 1, "backward"));
+  nextBtn.addEventListener("click", () => goToCard(currentIndex + 1, "forward"));
+
+  dotsContainer.addEventListener("click", (e) => {
+    const dot = e.target.closest(".nav-dot");
+    if (dot) {
+      goToCard(parseInt(dot.dataset.dot));
+    }
+  });
+
+  // Keyboard navigation
+  document.addEventListener("keydown", (e) => {
+    if (appShell.hidden) return;
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+      e.preventDefault();
+      goToCard(currentIndex + 1, "forward");
+    } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+      e.preventDefault();
+      goToCard(currentIndex - 1, "backward");
+    }
+  });
+
+  // Touch swipe
+  let touchStartX = 0;
+  let touchStartY = 0;
+  const viewport = document.getElementById("cardViewport");
+
+  viewport.addEventListener("touchstart", (e) => {
+    touchStartX = e.changedTouches[0].screenX;
+    touchStartY = e.changedTouches[0].screenY;
+  }, { passive: true });
+
+  viewport.addEventListener("touchend", (e) => {
+    const diffX = e.changedTouches[0].screenX - touchStartX;
+    const diffY = e.changedTouches[0].screenY - touchStartY;
+    const threshold = 50;
+
+    // Only horizontal swipes
+    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > threshold) {
+      if (diffX < 0) {
+        goToCard(currentIndex + 1, "forward");
+      } else {
+        goToCard(currentIndex - 1, "backward");
+      }
+    }
+  }, { passive: true });
 })();
