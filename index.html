@@ -80,7 +80,7 @@
           <span class="mode-badge" id="modeBadge"></span>
         </div>
         <div class="header-actions">
-          <span class="card-counter" id="cardCounter">1 / 10</span>
+          <span class="card-counter" id="cardCounter">1 / 50</span>
           <button data-theme-toggle aria-label="Switch to dark mode">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
           </button>
@@ -95,16 +95,34 @@
       </div>
     </main>
 
-    <!-- Navigation -->
+    <!-- Sticky bottom nav -->
     <nav class="card-nav" id="cardNav">
       <button class="nav-btn" id="prevBtn" aria-label="Previous card" disabled>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
-      <div class="nav-dots" id="navDots"></div>
+      <div class="nav-progress" id="navProgress">
+        <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+        <span class="score-label" id="scoreLabel"></span>
+      </div>
       <button class="nav-btn" id="nextBtn" aria-label="Next card">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg>
       </button>
     </nav>
+
+    <!-- Completion screen overlay -->
+    <div class="completion-screen" id="completionScreen" hidden>
+      <div class="completion-inner">
+        <div class="completion-icon" id="completionIcon"></div>
+        <h2 class="completion-title" id="completionTitle"></h2>
+        <p class="completion-subtitle" id="completionSubtitle"></p>
+        <div class="completion-score" id="completionScore"></div>
+        <div class="completion-breakdown" id="completionBreakdown"></div>
+        <div class="completion-actions">
+          <button class="completion-btn completion-btn--primary" id="completionRestart">Try Again</button>
+          <button class="completion-btn completion-btn--secondary" id="completionHome">Choose Mode</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="./data.js"></script>

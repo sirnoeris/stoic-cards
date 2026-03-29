@@ -11,6 +11,8 @@
   let currentIndex = 0;
   let answered = [];
   let expandedStates = [];
+  let score = 0;
+  let totalAnswered = 0;
 
   // Fisher-Yates shuffle — randomizes card order each time a mode is entered
   function shuffleArray(arr) {
@@ -29,9 +31,21 @@
   const counter = document.getElementById("cardCounter");
   const prevBtn = document.getElementById("prevBtn");
   const nextBtn = document.getElementById("nextBtn");
-  const dotsContainer = document.getElementById("navDots");
+  const progressFill = document.getElementById("progressFill");
+  const scoreLabel = document.getElementById("scoreLabel");
   const backBtn = document.getElementById("backBtn");
   const modeBadge = document.getElementById("modeBadge");
+  const viewport = document.getElementById("cardViewport");
+
+  // Completion screen refs
+  const completionScreen = document.getElementById("completionScreen");
+  const completionIcon = document.getElementById("completionIcon");
+  const completionTitle = document.getElementById("completionTitle");
+  const completionSubtitle = document.getElementById("completionSubtitle");
+  const completionScore = document.getElementById("completionScore");
+  const completionBreakdown = document.getElementById("completionBreakdown");
+  const completionRestart = document.getElementById("completionRestart");
+  const completionHome = document.getElementById("completionHome");
 
   // ========================================
   // THEME TOGGLE
@@ -84,10 +98,15 @@
     currentIndex = 0;
     answered = new Array(filteredCards.length).fill(false);
     expandedStates = new Array(filteredCards.length).fill(false);
+    score = 0;
+    totalAnswered = 0;
 
     // Update badge
     modeBadge.textContent = modeLabels[mode];
     modeBadge.className = "mode-badge mode-badge--" + mode;
+
+    // Hide completion screen if visible
+    completionScreen.hidden = true;
 
     // Transition screens
     modeScreen.classList.add("exiting");
@@ -107,6 +126,9 @@
   function exitMode() {
     currentMode = null;
     document.documentElement.removeAttribute("data-mode");
+
+    // Hide completion if showing
+    completionScreen.hidden = true;
 
     appShell.classList.remove("visible");
     appShell.classList.add("exiting");
@@ -181,7 +203,6 @@
 
   function renderAllCards() {
     container.innerHTML = filteredCards.map((card, i) => renderCard(card, i)).join("");
-    renderDots();
     updateNav();
     bindCardEvents();
   }
@@ -189,20 +210,24 @@
   // ========================================
   // NAVIGATION
   // ========================================
-  function renderDots() {
-    dotsContainer.innerHTML = filteredCards.map(
-      (_, i) => `<button class="nav-dot ${i === 0 ? "active" : ""}" data-dot="${i}" aria-label="Go to card ${i + 1}"></button>`
-    ).join("");
-  }
-
   function updateNav() {
     counter.textContent = `${currentIndex + 1} / ${filteredCards.length}`;
     prevBtn.disabled = currentIndex === 0;
-    nextBtn.disabled = currentIndex === filteredCards.length - 1;
 
-    document.querySelectorAll(".nav-dot").forEach((dot, i) => {
-      dot.classList.toggle("active", i === currentIndex);
-    });
+    // On last card, show "Finish" state instead of disabling next
+    const isLast = currentIndex === filteredCards.length - 1;
+    nextBtn.disabled = isLast;
+
+    // Update progress bar
+    const progress = ((currentIndex + 1) / filteredCards.length) * 100;
+    progressFill.style.width = progress + "%";
+
+    // Update score label
+    if (totalAnswered > 0) {
+      scoreLabel.textContent = `${score} / ${totalAnswered} correct`;
+    } else {
+      scoreLabel.textContent = `Card ${currentIndex + 1} of ${filteredCards.length}`;
+    }
   }
 
   function goToCard(newIndex, direction) {
@@ -238,6 +263,9 @@
 
     currentIndex = newIndex;
     updateNav();
+
+    // Scroll viewport back to top so the new card starts at the top
+    viewport.scrollTop = 0;
   }
 
   // ========================================
@@ -275,6 +303,8 @@
         const feedback = document.getElementById(`feedback-${cardIdx}`);
 
         answered[cardIdx] = true;
+        totalAnswered++;
+        if (isCorrect) score++;
 
         // Mark selected
         btn.classList.add("selected", isCorrect ? "correct" : "incorrect");
@@ -298,21 +328,88 @@
         btn.parentElement.querySelectorAll(".mcq-option").forEach((o) => {
           o.style.pointerEvents = "none";
         });
+
+        // Update score display
+        updateNav();
+
+        // Check if all cards have been answered
+        if (totalAnswered === filteredCards.length) {
+          // Brief delay to let the user see the last feedback
+          setTimeout(() => {
+            showCompletion();
+          }, 1200);
+        }
       });
     });
   }
 
   // ========================================
+  // COMPLETION SCREEN
+  // ========================================
+  function showCompletion() {
+    const pct = Math.round((score / filteredCards.length) * 100);
+    const total = filteredCards.length;
+
+    // Determine tier and message
+    let icon, title, subtitle;
+    if (pct >= 90) {
+      icon = "\u{1F3DB}\u{FE0F}";  // 🏛️
+      title = "Stoic Sage";
+      subtitle = "You\u2019ve internalised these teachings. The ancient philosophers would be impressed.";
+    } else if (pct >= 70) {
+      icon = "\u{1F4DC}";  // 📜
+      title = "Devoted Student";
+      subtitle = "A strong understanding. A few more passes and you\u2019ll have these principles wired in.";
+    } else if (pct >= 50) {
+      icon = "\u{1F331}";  // 🌱
+      title = "Growing Mind";
+      subtitle = "You\u2019re building a foundation. Come back tomorrow and you\u2019ll notice the ideas landing differently.";
+    } else {
+      icon = "\u{1F30A}";  // 🌊
+      title = "Just Beginning";
+      subtitle = "Every philosopher started here. Read the explanations, try again, and watch the ideas take root.";
+    }
+
+    completionIcon.textContent = icon;
+    completionTitle.textContent = title;
+    completionSubtitle.textContent = subtitle;
+    completionScore.textContent = `${score} / ${total}`;
+    completionBreakdown.textContent = `${pct}% correct \u2014 ${totalAnswered} questions answered`;
+
+    completionScreen.hidden = false;
+  }
+
+  completionRestart.addEventListener("click", () => {
+    completionScreen.hidden = true;
+    // Re-enter same mode (reshuffled)
+    const mode = currentMode;
+    filteredCards = shuffleArray(QUOTE_CARDS.filter((c) => c.mode === mode));
+    currentIndex = 0;
+    answered = new Array(filteredCards.length).fill(false);
+    expandedStates = new Array(filteredCards.length).fill(false);
+    score = 0;
+    totalAnswered = 0;
+    renderAllCards();
+    viewport.scrollTop = 0;
+  });
+
+  completionHome.addEventListener("click", () => {
+    exitMode();
+  });
+
+  // ========================================
   // GLOBAL NAVIGATION EVENTS
   // ========================================
   prevBtn.addEventListener("click", () => goToCard(currentIndex - 1, "backward"));
-  nextBtn.addEventListener("click", () => goToCard(currentIndex + 1, "forward"));
-
-  dotsContainer.addEventListener("click", (e) => {
-    const dot = e.target.closest(".nav-dot");
-    if (dot) {
-      goToCard(parseInt(dot.dataset.dot));
+  nextBtn.addEventListener("click", () => {
+    if (currentIndex === filteredCards.length - 1) {
+      // Last card — show completion if all answered, or just don't move
+      if (totalAnswered === filteredCards.length) {
+        showCompletion();
+      }
+      return;
     }
+    goToCard(currentIndex + 1, "forward");
   });
 
   // Keyboard navigation
@@ -330,7 +427,6 @@
   // Touch swipe
   let touchStartX = 0;
   let touchStartY = 0;
-  const viewport = document.getElementById("cardViewport");
 
   viewport.addEventListener("touchstart", (e) => {
     touchStartX = e.changedTouches[0].screenX;
